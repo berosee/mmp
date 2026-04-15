@@ -61,10 +61,6 @@ const playlists = {
         {
             "title": "Barbra Streisand - Woman In Love",
             "url": "music/jazz/Barbra Streisand - Woman In Love.flac"
-        },
-        {
-            "title": "신사동 그사람",
-            "url": "music/jazz/신사동 그사람.mp3"
         }
     ],
     "old": [
