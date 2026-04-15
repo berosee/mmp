@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <title>mpplay - Static Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        /* --- CSS: 디자인 (new.jpg 스타일 적용) --- */
+        :root {
+            --neon-blue: #00d2ff;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #121212; }
+        body { font-family: 'Pretendard', sans-serif; color: #fff; display: flex; flex-direction: column; align-items: center; }
+
+        .fixed-header {
+            width: 100%; max-width: 450px; display: flex; flex-direction: column;
+            align-items: center; background: #121212; z-index: 100; padding-bottom: 5px; flex-shrink: 0;
+        }
+
+        /* 카테고리 메뉴 */
+        .menu { 
+            display: flex; gap: 10px; margin: 15px auto; background: var(--glass-bg); 
+            padding: 5px 15px; border-radius: 50px; border: 1px solid var(--glass-border);
+        }
+        .menu button { 
+            width: 65px; background: #0a0a0a; color: #444; padding: 5px 0; 
+            border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid rgba(255,255,255,0.03); cursor: pointer;
+        }
+        .menu button.active { 
+            background: #003366 !important; color: var(--neon-blue) !important; 
+            border: 1px solid var(--neon-blue); box-shadow: 0 0 12px rgba(0, 210, 255, 0.4);
+        }
+
+        /* 플레이어 상단 정보 */
+        .player-card { width: 92%; text-align: center; padding: 5px 0; }
+        .title { font-size: 15px; font-weight: bold; margin-bottom: 8px; color: var(--neon-blue); height: 1.2em; overflow: hidden; }
+        .time-display { font-size: 12px; font-family: 'Consolas', monospace; color: #777; margin-bottom: 10px; }
+
+        /* 프로그레스 바 */
+        .progress-container { width: 100%; margin-bottom: 15px; cursor: pointer; }
+        .progress-bg { height: 2px; background: rgba(255, 255, 255, 0.1); }
+        .progress-fill { width: 0%; height: 100%; background: var(--neon-blue); transition: width 0.1s; }
+
+        /* 컨트롤 버튼 */
+        .controls { display: flex; justify-content: center; align-items: center; gap: 15px; padding-bottom: 10px; }
+        .btn-nav { background: #1a1a1a; color: #888; border: 1px solid #222; border-radius: 30px; padding: 6px 15px; font-size: 12px; cursor: pointer; }
+        .btn-play-box { 
+            border: 1.5px solid var(--neon-blue); border-radius: 50%; width: 42px; height: 42px; 
+            display: flex; align-items: center; justify-content: center; cursor: pointer; background: #0a0a0a;
+        }
+        #btnIcon { font-size: 18px; color: var(--neon-blue); }
+
+        /* 리스트 영역 */
+        .playlist-wrapper { flex: 1; width: 100%; max-width: 450px; overflow-y: auto; background: rgba(0,0,0,0.4); border-radius: 20px 20px 0 0; }
+        .playlist-table { width: 100%; border-collapse: collapse; }
+        .playlist-table td { padding: 14px 20px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.02); color: #888; cursor: pointer; text-align: left; }
+        .playlist-table tr.playing td { color: var(--neon-blue); background: rgba(0, 210, 255, 0.08); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="fixed-header">
+    <div class="menu">
+        <button id="old" class="active" onclick="loadCategory('old')">OLD</button>
+        <button id="enka" onclick="loadCategory('enka')">ENKA</button>
+        <button id="jazz" onclick="loadCategory('jazz')">JAZZ</button>
+    </div>
+
+    <div class="player-card">
+        <div class="title" id="labelTitle">곡을 선택해 주세요</div>
+        <div class="time-display"><span id="curTime">00:00</span> / <span id="durTime">00:00</span></div>
+        
+        <div class="progress-container" id="progArea">
+            <div class="progress-bg"><div class="progress-fill" id="progFill"></div></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-nav" onclick="prevSong()">⏮ 이전</button>
+            <div class="btn-play-box" id="btnPlayWrap" onclick="togglePlay()"><span id="btnIcon">▶</span></div>
+            <button class="btn-nav" onclick="nextSong()">다음 ⏭</button>
+            <button class="btn-nav" onclick="randomSong()">랜덤</button>
+        </div>
+    </div>
+</div>
+
+<div class="playlist-wrapper">
+    <table class="playlist-table" id="listTable">
+        </table>
+</div>
+
+<script>
+    /* --- JS: 데이터 (여기에 곡 정보를 고정으로 입력하세요) --- */
+    const playlists = {
+        "enka": [
+        {
+            "title": "016 No. 3 in D minor - 2. Tempo di Menuetto. Sehr masig",
+            "url": "music/enka/016 No. 3 in D minor - 2. Tempo di Menuetto. Sehr masig.flac"
+        },
+        {
+            "title": "018 No. 3 in D minor - 4. Sehr langsam. Misterioso. Durchaus ppp O Mensch! Gib acht!",
+            "url": "music/enka/018 No. 3 in D minor - 4. Sehr langsam. Misterioso. Durchaus ppp O Mensch! Gib acht!.flac"
+        },
+        {
+            "title": "019 No. 3 in D minor - 5. Lustig im Tempo und keck im Ausdruck Bimm bammEs sungen drei Engel",
+            "url": "music/enka/019 No. 3 in D minor - 5. Lustig im Tempo und keck im Ausdruck Bimm bammEs sungen drei Engel.flac"
+        },
+        {
+            "title": "021 No. 4 in G major - 1. Bedachtig. Nicht eilen",
+            "url": "music/enka/021 No. 4 in G major - 1. Bedachtig. Nicht eilen.flac"
+        },
+        {
+            "title": "022 No. 4 in G major - 2. In gemachlicher Bewegung. Ohne Hast",
+            "url": "music/enka/022 No. 4 in G major - 2. In gemachlicher Bewegung. Ohne Hast.flac"
+        },
+        {
+            "title": "023 No. 4 in G major - 3. Ruhevoll. Poco Adagio",
+            "url": "music/enka/023 No. 4 in G major - 3. Ruhevoll. Poco Adagio.flac"
+        },
+        {
+            "title": "024 No. 4 in G major - 4. Sehr behaglich Wir geniesen die himmlischen Freuden",
+            "url": "music/enka/024 No. 4 in G major - 4. Sehr behaglich Wir geniesen die himmlischen Freuden.flac"
+        },
+        {
+            "title": "Four Seasons 'Autumn'-  Allegro (La Caccia)",
+            "url": "music/enka/Four Seasons 'Autumn'-  Allegro (La Caccia).mp3"
+        },
+        {
+            "title": "Four Seasons 'Autumn'- Adagio",
+            "url": "music/enka/Four Seasons 'Autumn'- Adagio.mp3"
+        },
+        {
+            "title": "Four Seasons 'Autumn'- Allegro",
+            "url": "music/enka/Four Seasons 'Autumn'- Allegro.mp3"
+        },
+        {
+            "title": "Four Seasons 'Spring'- Allegro (danza)",
+            "url": "music/enka/Four Seasons 'Spring'- Allegro (danza).mp3"
+        },
+        {
+            "title": "Four Seasons 'Spring'- Allegro",
+            "url": "music/enka/Four Seasons 'Spring'- Allegro.mp3"
+        },
+        {
+            "title": "Four Seasons 'Spring'- Largo e pianissimo",
+            "url": "music/enka/Four Seasons 'Spring'- Largo e pianissimo.mp3"
+        }
+    ],
+    "jazz": [
+        {
+            "title": "Andy Williams - Love Is Blue",
+            "url": "music/jazz/Andy Williams - Love Is Blue.flac"
+        },
+        {
+            "title": "Barbra Streisand - Woman In Love",
+            "url": "music/jazz/Barbra Streisand - Woman In Love.flac"
+        },
+        {
+            "title": "신사동 그사람",
+            "url": "music/jazz/신사동 그사람.mp3"
+        }
+    ],
+    "old": [
+        {
+            "title": "Beyonce - TEXAS HOLD EM",
+            "url": "music/old/Beyonce - TEXAS HOLD EM.mp3"
+        },
+        {
+            "title": "Daniel - Blackboard of My Heart",
+            "url": "music/old/Daniel - Blackboard of My Heart.mp3"
+        },
+        {
+            "title": "Daniel - Pretty Little Girl From Omagh",
+            "url": "music/old/Daniel - Pretty Little Girl From Omagh.mp3"
+        },
+        {
+            "title": "Green Green Grass Of Home",
+            "url": "music/old/Green Green Grass Of Home.mp3"
+        },
+        {
+            "title": "Isla Grant - Every Moment Of Every Hour",
+            "url": "music/old/Isla Grant - Every Moment Of Every Hour.mp3"
+        },
+        {
+            "title": "Isla Grant - Only Yesterday",
+            "url": "music/old/Isla Grant - Only Yesterday.mp3"
+        },
+        {
+            "title": "Jonny Cash - Cotton Fields",
+            "url": "music/old/Jonny Cash - Cotton Fields.mp3"
+        },
+        {
+            "title": "Mary Duff - Just Lovin' You",
+            "url": "music/old/Mary Duff - Just Lovin' You.mp3"
+        },
+        {
+            "title": "Mary Duff - Power Of Love",
+            "url": "music/old/Mary Duff - Power Of Love.mp3"
+        },
+        {
+            "title": "Mary Duff - Will You Walk With Me",
+            "url": "music/old/Mary Duff - Will You Walk With Me.mp3"
+        },
+        {
+            "title": "The Carpenters - Yesterday Once More",
+            "url": "music/old/The Carpenters - Yesterday Once More.mp3"
+        },
+        {
+            "title": "Tom Jones - Delilah",
+            "url": "music/old/Tom Jones - Delilah.mp3"
+        },
+        {
+            "title": "dave - The Happy Organ",
+            "url": "music/old/dave - The Happy Organ.flac"
+        }
+        ]
+    };
+
+    let currentCategory = "old";
+    let currentIndex = 0;
+    const audio = new Audio();
+
+    // 카테고리 변경 및 리스트 그리기
+    function loadCategory(cat) {
+        currentCategory = cat;
+        currentIndex = 0;
+        
+        // 버튼 활성화 스타일
+        document.querySelectorAll('.menu button').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(cat).classList.add('active');
+
+        // 테이블 생성
+        const listTable = document.getElementById("listTable");
+        let html = "";
+        playlists[cat].forEach((song, idx) => {
+            html += `<tr id="song-${idx}" onclick="playSong(${idx})"><td>${song.title}</td></tr>`;
+        });
+        listTable.innerHTML = html;
+    }
+
+    // 노래 재생
+    function playSong(idx) {
+        currentIndex = idx;
+        const song = playlists[currentCategory][currentIndex];
+        audio.src = song.url;
+        audio.play();
+        document.getElementById("labelTitle").textContent = song.title;
+        updateUI();
+    }
+
+    function togglePlay() {
+        if (!audio.src) { playSong(0); return; }
+        audio.paused ? audio.play() : audio.pause();
+    }
+
+    function updateUI() {
+        const rows = document.querySelectorAll("#listTable tr");
+        rows.forEach((row, k) => {
+            row.classList.toggle("playing", k === currentIndex);
+        });
+    }
+
+    // 시간 및 프로그레스 업데이트
+    audio.ontimeupdate = () => {
+        if (audio.duration) {
+            const cur = audio.currentTime;
+            const dur = audio.duration;
+            document.getElementById("curTime").textContent = formatTime(cur);
+            document.getElementById("durTime").textContent = formatTime(dur);
+            document.getElementById("progFill").style.width = (cur / dur * 100) + "%";
+        }
+    };
+
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return m.toString().padStart(2, '0') + ":" + s.toString().padStart(2, '0');
+    }
+
+    audio.onplay = () => document.getElementById("btnIcon").textContent = "Ⅱ";
+    audio.onpause = () => document.getElementById("btnIcon").textContent = "▶";
+    audio.onended = () => nextSong();
+
+    function nextSong() {
+        currentIndex = (currentIndex + 1) % playlists[currentCategory].length;
+        playSong(currentIndex);
+    }
+
+    function prevSong() {
+        currentIndex = (currentIndex - 1 + playlists[currentCategory].length) % playlists[currentCategory].length;
+        playSong(currentIndex);
+    }
+
+    function randomSong() {
+        currentIndex = Math.floor(Math.random() * playlists[currentCategory].length);
+        playSong(currentIndex);
+    }
+
+    // 프로그레스 바 클릭 이동
+    document.getElementById("progArea").onclick = function(e) {
+        if (audio.duration) {
+            audio.currentTime = (e.offsetX / this.clientWidth) * audio.duration;
+        }
+    };
+
+    // 초기 실행
+    loadCategory('old');
+</script>
+
+</body>
+</html>
